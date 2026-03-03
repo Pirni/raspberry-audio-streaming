@@ -1,0 +1,13 @@
+services:
+  audio-streamer:
+    image: tiangolo/nginx-rtmp:latest
+    ports:
+      - "8081:1935"   # Ingest (RTMP)
+      - "8080:8080"   # Playback (HLS)
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web:/var/www/html:ro
+      
+    # Using tmpfs for the HLS folder to protect SD card/SSD
+    tmpfs:
+      - /tmp/hls

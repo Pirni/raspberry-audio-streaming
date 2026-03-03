@@ -1,0 +1,12 @@
+{
+  "wireguard": {
+    "enabled": false,
+    "conf_path": ""
+  },
+  "stream": {
+    "enabled": false,
+    "url": "rtmp://IP:8081/live/mystream",
+    "input": "",
+    "ffmpeg_args": "-c:a aac -b:a 128k -f flv -flvflags no_duration_filesize"
+  }
+}

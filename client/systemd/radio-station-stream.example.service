@@ -1,0 +1,15 @@
+[Unit]
+Description=RadioStation ffmpeg Stream
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=FOLDER_NAME/stream
+ExecStart=FOLDER_NAME/venv/bin/python FOLDER_NAME/stream/stream.py
+
+Restart=on-failure
+RestartSec=10

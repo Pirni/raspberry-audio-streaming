@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Radio Station Web</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; max-width: 980px; }
+    h1 { margin-bottom: 8px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; flex: 1; min-width: 320px; }
+    button { padding: 8px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    button:hover { background: #f6f6f6; }
+    input { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid #ccc; }
+    label { display: block; margin-top: 10px; margin-bottom: 6px; font-size: 14px; color: #333; }
+    pre { background: #f7f7f7; padding: 12px; border-radius: 10px; overflow: auto; }
+    .muted { color: #666; font-size: 13px; }
+    .ok { color: #0a7; }
+    .bad { color: #c00; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 14px; }
+    th { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Radio Station Web</h1>
+  <div class="muted">Wi-Fi setup + WireGuard config upload + Stream configuration</div>
+
+  <div class="row" style="margin-top: 16px;">
+    <div class="card">
+      <h2>Wi-Fi status</h2>
+      <button onclick="refreshWifiStatus()">Refresh</button>
+      <div id="wifiStatus" class="muted" style="margin-top:10px;"></div>
+
+      <h3 style="margin-top:18px;">Scan networks</h3>
+      <button onclick="scanWifi()">Scan</button>
+      <div id="wifiScan" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Connect Wi-Fi (optional)</h2>
+      <label>SSID</label>
+      <input id="ssid" placeholder="Network name" />
+      <label>Password (PSK) — optional</label>
+      <input id="psk" placeholder="Leave empty for open / saved network" type="password" />
+      <div style="margin-top:12px;">
+        <button onclick="connectWifi()">Connect</button>
+      </div>
+      <div id="wifiConnectResult" style="margin-top:10px;"></div>
+
+      <h3 style="margin-top:18px;">Saved / registered connections</h3>
+      <button onclick="loadSaved()">Load</button>
+      <div id="savedList" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top: 16px;">
+    <div class="card">
+      <h2>WireGuard</h2>
+      <div class="muted">This UI stores a .conf file and toggles a JSON flag.</div>
+      <button onclick="refreshWgStatus()" style="margin-top:10px;">Refresh</button>
+      <div id="wgStatus" class="muted" style="margin-top:10px;"></div>
+
+      <h3 style="margin-top:18px;">Upload config (saved as user-config/wg0.conf)</h3>
+      <input id="wgFile" type="file" accept=".conf,text/plain" />
+      <div style="margin-top:12px;">
+        <button onclick="uploadWg()">Upload</button>
+      </div>
+      <div id="wgUploadResult" style="margin-top:10px;"></div>
+
+      <h3 style="margin-top:18px;">Toggle enabled flag in JSON</h3>
+      <div class="row">
+        <button onclick="setWg(true)">Set enabled=true</button>
+        <button onclick="setWg(false)">Set enabled=false</button>
+      </div>
+      <div id="wgEnableResult" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Stream configuration</h2>
+
+      <button onclick="refreshStream()">Refresh</button>
+      <div id="streamStatus" class="muted" style="margin-top:10px;"></div>
+
+      <h3 style="margin-top:18px;">Settings</h3>
+
+      <label>Stream enabled</label>
+      <div class="row">
+        <button onclick="setStreamEnabled(true)">Enable</button>
+        <button onclick="setStreamEnabled(false)">Disable</button>
+      </div>
+
+      <label style="margin-top:14px;">Stream URL</label>
+      <input id="streamUrl" placeholder="rtmp://... or https://..." />
+
+      <label>Input (optional)</label>
+      <input id="streamInput" placeholder="e.g. hw:1,0 or /dev/video0" />
+
+      <label>FFmpeg args (optional)</label>
+      <input id="streamFfmpegArgs" placeholder='e.g. -re -vn -c:a libopus -b:a 96k' />
+
+      <div style="margin-top:12px;">
+        <button onclick="saveStream()">Save</button>
+      </div>
+
+      <div id="streamResult" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+<script>
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  const ct = res.headers.get("content-type") || "";
+  const body = ct.includes("application/json") ? await res.json() : await res.text();
+  if (!res.ok) {
+    const msg = (body && body.detail) ? body.detail : JSON.stringify(body);
+    throw new Error(msg);
+  }
+  return body;
+}
+
+function esc(s){
+  return (s ?? "").toString().replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+async function refreshWifiStatus() {
+  const el = document.getElementById("wifiStatus");
+  el.textContent = "Loading…";
+  try {
+    const st = await api("/api/wifi/status");
+    el.innerHTML = `
+      <div><b>Device:</b> ${esc(st.device)}</div>
+      <div><b>State:</b> ${esc(st.state)}</div>
+      <div><b>Connection:</b> ${esc(st.connection)}</div>
+      <div><b>IPv4:</b> ${esc(st.ip4_address)}</div>
+      <div><b>Gateway:</b> ${esc(st.ip4_gateway)}</div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+async function scanWifi() {
+  const el = document.getElementById("wifiScan");
+  el.textContent = "Scanning…";
+  try {
+    const data = await api("/api/wifi/scan");
+    const rows = data.networks.map(n => `
+      <tr>
+        <td>${esc(n.ssid)}</td>
+        <td>${esc(n.security)}</td>
+        <td>${esc(n.signal)}</td>
+        <td>${esc(n.bars)}</td>
+        <td><button onclick="pickSsid('${esc(n.ssid).replace(/'/g,"&#39;")}')">Use</button></td>
+      </tr>
+    `).join("");
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>SSID</th><th>Security</th><th>Signal</th><th>Bars</th><th></th></tr></thead>
+        <tbody>${rows || "<tr><td colspan='5' class='muted'>No networks found</td></tr>"}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    el.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+function pickSsid(ssid) {
+  document.getElementById("ssid").value = ssid;
+}
+
+async function connectWifi() {
+  const out = document.getElementById("wifiConnectResult");
+  out.textContent = "Connecting…";
+  try {
+    const ssid = document.getElementById("ssid").value.trim();
+    const psk = document.getElementById("psk").value;
+    const body = JSON.stringify({ ssid, psk: psk ? psk : null });
+    const res = await api("/api/wifi/connect", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body
+    });
+    out.innerHTML = `<div class="ok">OK</div><pre>${esc(res.result)}</pre>`;
+    await refreshWifiStatus();
+  } catch (e) {
+    out.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+async function loadSaved() {
+  const el = document.getElementById("savedList");
+  el.textContent = "Loading…";
+  try {
+    const data = await api("/api/wifi/saved");
+    const rows = data.connections.map(c => `
+      <tr>
+        <td>${esc(c.name)}</td>
+        <td>${esc(c.type)}</td>
+        <td>${esc(c.device)}</td>
+      </tr>
+    `).join("");
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Name</th><th>Type</th><th>Device</th></tr></thead>
+        <tbody>${rows || "<tr><td colspan='3' class='muted'>No saved connections</td></tr>"}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    el.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+async function refreshWgStatus() {
+  const el = document.getElementById("wgStatus");
+  el.textContent = "Loading…";
+  try {
+    const st = await api("/api/wg/status");
+    el.innerHTML = `
+      <div><b>Enabled flag:</b> ${st.enabled ? "<span class='ok'>true</span>" : "<span class='bad'>false</span>"}</div>
+      <div><b>Config present:</b> ${st.conf_exists ? "<span class='ok'>yes</span>" : "<span class='bad'>no</span>"}</div>
+      <div><b>conf_path:</b> ${esc(st.conf_path)}</div>
+      <div><b>JSON config:</b> ${esc(st.config_path)}</div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+async function uploadWg() {
+  const out = document.getElementById("wgUploadResult");
+  out.textContent = "Uploading…";
+  try {
+    const f = document.getElementById("wgFile").files[0];
+    if (!f) throw new Error("Select a .conf file first.");
+    const fd = new FormData();
+    fd.append("file", f);
+    const res = await api("/api/wg/upload", { method: "POST", body: fd });
+    out.innerHTML = `<div class="ok">Saved</div><pre>${esc(JSON.stringify(res, null, 2))}</pre>`;
+    await refreshWgStatus();
+  } catch (e) {
+    out.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+async function setWg(enabled) {
+  const out = document.getElementById("wgEnableResult");
+  out.textContent = "Saving…";
+  try {
+    const res = await api("/api/wg/enable", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled })
+    });
+    out.innerHTML = `<div class="ok">OK</div><pre>${esc(JSON.stringify(res, null, 2))}</pre>`;
+    await refreshWgStatus();
+  } catch (e) {
+    out.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+// ---- Stream UI --------------------------------------------------------------
+
+let streamEnabledCache = false;
+
+async function refreshStream() {
+  const el = document.getElementById("streamStatus");
+  el.textContent = "Loading…";
+  try {
+    const st = await api("/api/stream");
+    streamEnabledCache = !!st.enabled;
+
+    document.getElementById("streamUrl").value = st.url || "";
+    document.getElementById("streamInput").value = st.input || "";
+    document.getElementById("streamFfmpegArgs").value = st.ffmpeg_args || "";
+
+    el.innerHTML = `
+      <div><b>Enabled:</b> ${st.enabled ? "<span class='ok'>true</span>" : "<span class='bad'>false</span>"}</div>
+      <div><b>URL:</b> ${esc(st.url || "(not set)")}</div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+async function setStreamEnabled(enabled) {
+  streamEnabledCache = enabled;
+  await saveStream();
+}
+
+async function saveStream() {
+  const out = document.getElementById("streamResult");
+  out.textContent = "Saving…";
+  try {
+    const url = document.getElementById("streamUrl").value.trim();
+    const inputDevice = document.getElementById("streamInput").value;
+    const ffmpeg_args = document.getElementById("streamFfmpegArgs").value;
+
+    const res = await api("/api/stream", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled: streamEnabledCache, url, input: inputDevice, ffmpeg_args })
+    });
+
+    out.innerHTML = `<div class="ok">Saved</div><pre>${esc(JSON.stringify(res, null, 2))}</pre>`;
+    await refreshStream();
+  } catch (e) {
+    out.innerHTML = `<span class="bad">Error:</span> ${esc(e.message)}`;
+  }
+}
+
+refreshWifiStatus();
+refreshWgStatus();
+refreshStream();
+</script>
+</body>
+</html>

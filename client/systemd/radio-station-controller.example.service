@@ -1,0 +1,15 @@
+[Unit]
+Description=RadioStation Controller
+After=network.target
+Wants=radio-station-web.service
+
+[Service]
+Type=simple
+User=root
+Environment=PYTHONUNBUFFERED=1
+ExecStart=FOLDER_NAME/venv/bin/python FOLDER_NAME/controller/controller.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

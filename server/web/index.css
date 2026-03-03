@@ -1,0 +1,28 @@
+body {
+  font-family: sans-serif;
+  text-align: center;
+  background: #f9f9f9;
+}
+
+.stream-link {
+  display: block;
+  background: white;
+  margin: 10px auto;
+  padding: 20px;
+  width: 300px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: #333;
+  font-weight: bold;
+}
+
+.stream-link:hover {
+  background: #e0f0ff;
+}
+
+.live-dot {
+  color: green;
+  margin-right: 5px;
+  font-size: 20px;
+}

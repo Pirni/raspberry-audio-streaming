@@ -1,0 +1,15 @@
+[Unit]
+Description=RadioStation Config Web
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=FOLDER_NAME/web
+Environment=PYTHONUNBUFFERED=1
+ExecStart=FOLDER_NAME/venv/bin/uvicorn web:app --host 0.0.0.0 --port 80
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+key.ignore
+!*.mp3
+user-config/status.json
+user-config/config.json
+web/__pycache__
