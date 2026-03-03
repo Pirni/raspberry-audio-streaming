@@ -41,7 +41,7 @@ The project includes:
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| **RTMP Ingest** | `1935` | Stream audio input from client to server |
+| **RTMP Ingest** | `8081` | Stream audio input from client to server |
 | **HLS Playback** | `8080` | Web UI for listening to the stream |
 | **Web Configurator** | `80` | Client-side configuration interface (optional) |
 
@@ -82,6 +82,10 @@ The project includes:
    - Navigate to your VPN server IP on port 8080: `http://<vpn-server-ip>:8080`
    - The RTMP stream will be ingested on port 1935 from the client
    - Verify the stream is being received and test playback in the HLS player
+
+### PiVPN
+The easiest way to setup a vpn is using the following tool:
+https://www.pivpn.io/
 
 ## Contributing
 
